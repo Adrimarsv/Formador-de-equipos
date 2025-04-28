@@ -66,8 +66,6 @@
 
   <button onclick="exportarExcel()">Descargar Excel</button>
 
-  <input type="file" id="fileInput" onchange="cargarArchivoExcel()" />
-  
   <div class="resultados" id="tablaResultados"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -75,6 +73,29 @@
     let equiposGlobal = [];
     let jugadoresGlobal = [];
     let partidosGlobal = [];
+
+    // Cargar los jugadores y equipos desde localStorage al cargar la página
+    function cargarDatos() {
+      const jugadoresGuardados = localStorage.getItem('jugadores');
+      const equiposGuardados = localStorage.getItem('equipos');
+      
+      if (jugadoresGuardados) {
+        jugadoresGlobal = JSON.parse(jugadoresGuardados);
+      }
+      
+      if (equiposGuardados) {
+        equiposGlobal = JSON.parse(equiposGuardados);
+      }
+      
+      // Si hay datos, actualizar la tabla de resultados
+      actualizarTablaResultados();
+    }
+
+    // Guardar los jugadores y equipos en localStorage
+    function guardarDatos() {
+      localStorage.setItem('jugadores', JSON.stringify(jugadoresGlobal));
+      localStorage.setItem('equipos', JSON.stringify(equiposGlobal));
+    }
 
     function generarEquipos() {
       let texto = document.getElementById('jugadoresInput').value.trim();
@@ -110,6 +131,9 @@
       equiposGlobal = equipos;
       jugadoresGlobal = jugadores;
       partidosGlobal = [];
+
+      // Guardar los resultados en localStorage
+      guardarDatos();
 
       mostrarResultados(equipos, sobrantes);
       actualizarTablaResultados();
@@ -164,17 +188,15 @@
 
       document.getElementById(`partido${partidoId}`).style.backgroundColor = "#d0ffd0";
 
+      // Guardar los resultados en localStorage
+      guardarDatos();
+
       actualizarTablaResultados();
     }
 
     function actualizarTablaResultados() {
       let div = document.getElementById('tablaResultados');
       div.innerHTML = "<h2>Tabla de Resultados:</h2>";
-
-      div.innerHTML += `
-        <button onclick="ordenarPorNombre()">Ordenar por Nombre</button>
-        <button onclick="ordenarPorPuntos()">Ordenar por Puntos</button>
-      `;
 
       let tabla = `<table><tr><th>Nombre</th><th>Tier</th><th>Puntos</th></tr>`;
       jugadoresGlobal.forEach(j => {
@@ -183,16 +205,6 @@
       tabla += `</table>`;
 
       div.innerHTML += tabla;
-    }
-
-    function ordenarPorNombre() {
-      jugadoresGlobal.sort((a, b) => a.nombre.localeCompare(b.nombre));
-      actualizarTablaResultados();
-    }
-
-    function ordenarPorPuntos() {
-      jugadoresGlobal.sort((a, b) => b.puntos - a.puntos);
-      actualizarTablaResultados();
     }
 
     function exportarExcel() {
@@ -217,39 +229,8 @@
       XLSX.writeFile(wb, "equipos_resultados.xlsx");
     }
 
-    function cargarArchivoExcel() {
-      let input = document.getElementById('fileInput');
-      let archivo = input.files[0];
-      
-      if (!archivo) {
-        alert("Por favor, selecciona un archivo Excel.");
-        return;
-      }
-
-      let reader = new FileReader();
-      reader.onload = function(event) {
-        let data = event.target.result;
-        let wb = XLSX.read(data, { type: 'binary' });
-
-        // Obtener la primera hoja del archivo Excel
-        let ws = wb.Sheets[wb.SheetNames[0]];
-        
-        // Convertir la hoja a un formato JSON
-        let jugadoresDelArchivo = XLSX.utils.sheet_to_json(ws);
-        
-        // Actualizar jugadoresGlobal con los puntos del archivo cargado
-        jugadoresDelArchivo.forEach(jugador => {
-          let jugadorExistente = jugadoresGlobal.find(j => j.nombre === jugador.Nombre);
-          if (jugadorExistente) {
-            jugadorExistente.puntos += jugador.Puntos;
-          }
-        });
-
-        actualizarTablaResultados();
-      };
-
-      reader.readAsBinaryString(archivo);
-    }
+    // Cargar los datos cuando se inicia la página
+    window.onload = cargarDatos;
   </script>
 
 </body>
