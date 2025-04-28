@@ -16,7 +16,7 @@
       height: 150px;
     }
     button {
-      margin-top: 10px;
+      margin: 5px;
       padding: 10px 20px;
       cursor: pointer;
     }
@@ -61,10 +61,12 @@
   
   <br>
   <button onclick="generarEquipos()">Generar Equipos</button>
+  <button onclick="ordenarPorPuntos()">Ordenar por Puntos</button>
+  <button onclick="exportarExcel()">Descargar Excel Equipos</button>
+  <button onclick="descargarTabla()">Descargar Tabla de Jugadores</button>
+  <button onclick="limpiarTabla()">Limpiar Tabla</button>
 
   <div class="resultados" id="resultados"></div>
-
-  <button onclick="exportarExcel()">Descargar Excel</button>
 
   <div class="resultados" id="tablaResultados"></div>
 
@@ -74,27 +76,16 @@
     let jugadoresGlobal = [];
     let partidosGlobal = [];
 
-    // Cargar los jugadores y equipos desde localStorage al cargar la página
-    function cargarDatos() {
-      const jugadoresGuardados = localStorage.getItem('jugadores');
-      const equiposGuardados = localStorage.getItem('equipos');
-      
+    window.onload = function() {
+      let jugadoresGuardados = localStorage.getItem('jugadoresGlobal');
       if (jugadoresGuardados) {
         jugadoresGlobal = JSON.parse(jugadoresGuardados);
+        actualizarTablaResultados();
       }
-      
-      if (equiposGuardados) {
-        equiposGlobal = JSON.parse(equiposGuardados);
-      }
-      
-      // Si hay datos, actualizar la tabla de resultados
-      actualizarTablaResultados();
-    }
+    };
 
-    // Guardar los jugadores y equipos en localStorage
-    function guardarDatos() {
-      localStorage.setItem('jugadores', JSON.stringify(jugadoresGlobal));
-      localStorage.setItem('equipos', JSON.stringify(equiposGlobal));
+    function guardarJugadoresEnLocalStorage() {
+      localStorage.setItem('jugadoresGlobal', JSON.stringify(jugadoresGlobal));
     }
 
     function generarEquipos() {
@@ -105,38 +96,41 @@
       }
 
       let lineas = texto.split('\n');
-      let jugadores = [];
+      let nuevosJugadores = [];
 
       for (let linea of lineas) {
         let partes = linea.split(',');
         if (partes.length !== 2) continue;
-        jugadores.push({ nombre: partes[0].trim(), tier: parseInt(partes[1].trim()), puntos: 0 });
+        nuevosJugadores.push({ nombre: partes[0].trim(), tier: parseInt(partes[1].trim()), puntos: 0 });
       }
 
-      jugadores = jugadores.sort(() => Math.random() - 0.5);
+      for (let nuevo of nuevosJugadores) {
+        let existente = jugadoresGlobal.find(j => j.nombre === nuevo.nombre);
+        if (!existente) {
+          jugadoresGlobal.push(nuevo);
+        }
+      }
 
-      let tier1 = jugadores.filter(j => j.tier === 1);
-      let tier2 = jugadores.filter(j => j.tier === 2);
-      let tier3 = jugadores.filter(j => j.tier === 3);
+      jugadoresGlobal = jugadoresGlobal.sort(() => Math.random() - 0.5);
 
-      let equipos = [];
+      let tier1 = jugadoresGlobal.filter(j => j.tier === 1);
+      let tier2 = jugadoresGlobal.filter(j => j.tier === 2);
+      let tier3 = jugadoresGlobal.filter(j => j.tier === 3);
+
+      equiposGlobal = [];
+      partidosGlobal = [];
       let sobrantes = [];
 
       while (tier1.length >= 1 && tier2.length >= 2 && tier3.length >= 2) {
         let equipo = [tier1.pop(), tier2.pop(), tier2.pop(), tier3.pop(), tier3.pop()];
-        equipos.push(equipo);
+        equiposGlobal.push(equipo);
       }
 
       sobrantes = [...tier1, ...tier2, ...tier3];
-      equiposGlobal = equipos;
-      jugadoresGlobal = jugadores;
-      partidosGlobal = [];
 
-      // Guardar los resultados en localStorage
-      guardarDatos();
-
-      mostrarResultados(equipos, sobrantes);
+      mostrarResultados(equiposGlobal, sobrantes);
       actualizarTablaResultados();
+      guardarJugadoresEnLocalStorage();
     }
 
     function mostrarResultados(equipos, sobrantes) {
@@ -188,10 +182,8 @@
 
       document.getElementById(`partido${partidoId}`).style.backgroundColor = "#d0ffd0";
 
-      // Guardar los resultados en localStorage
-      guardarDatos();
-
       actualizarTablaResultados();
+      guardarJugadoresEnLocalStorage();
     }
 
     function actualizarTablaResultados() {
@@ -229,8 +221,42 @@
       XLSX.writeFile(wb, "equipos_resultados.xlsx");
     }
 
-    // Cargar los datos cuando se inicia la página
-    window.onload = cargarDatos;
+    function descargarTabla() {
+      if (jugadoresGlobal.length === 0) {
+        alert("No hay jugadores para exportar.");
+        return;
+      }
+
+      let wb = XLSX.utils.book_new();
+      let data = [["Nombre", "Tier", "Puntos"]];
+
+      jugadoresGlobal.forEach(jugador => {
+        data.push([jugador.nombre, jugador.tier, jugador.puntos]);
+      });
+
+      let ws = XLSX.utils.aoa_to_sheet(data);
+      XLSX.utils.book_append_sheet(wb, ws, "Jugadores");
+      XLSX.writeFile(wb, "jugadores_puntos.xlsx");
+    }
+
+    function limpiarTabla() {
+      if (confirm("¿Seguro que quieres borrar todo? Esta acción no se puede deshacer.")) {
+        jugadoresGlobal = [];
+        equiposGlobal = [];
+        partidosGlobal = [];
+        localStorage.clear();
+        document.getElementById('jugadoresInput').value = "";
+        document.getElementById('resultados').innerHTML = "";
+        document.getElementById('tablaResultados').innerHTML = "";
+        alert("Tabla limpiada correctamente.");
+      }
+    }
+
+    function ordenarPorPuntos() {
+      jugadoresGlobal.sort((a, b) => b.puntos - a.puntos);
+      actualizarTablaResultados();
+    }
+
   </script>
 
 </body>
