@@ -4,17 +4,59 @@
   <meta charset="UTF-8">
   <title>Formador de Equipos</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    textarea { width: 100%; height: 150px; }
-    button { margin-top: 10px; padding: 10px; }
-    .resultados { margin-top: 20px; }
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    textarea {
+      width: 400px;
+      height: 150px;
+    }
+    button {
+      margin-top: 10px;
+      padding: 10px 20px;
+      cursor: pointer;
+    }
+    .resultados {
+      margin-top: 20px;
+      width: 600px;
+      text-align: center;
+    }
+    .equipo, .partido {
+      margin: 10px 0;
+      padding: 10px;
+      border: 2px solid #444;
+      border-radius: 10px;
+    }
+    .equipo {
+      background-color: #f0f0f0;
+    }
+    .equipo:hover {
+      background-color: #d0ffd0;
+      cursor: pointer;
+    }
+    table {
+      margin-top: 30px;
+      width: 600px;
+      border-collapse: collapse;
+    }
+    table, th, td {
+      border: 1px solid black;
+    }
+    th, td {
+      padding: 8px;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
 
   <h1>Generador de Equipos y Partidos</h1>
 
-  <p>Ingresa la lista de jugadores (formato: Nombre, Tier):</p>
+  <p>Ingresa la lista de jugadores (Nombre, Tier):</p>
   <textarea id="jugadoresInput" placeholder="Ejemplo:&#10;Jugador1,1&#10;Jugador2,2&#10;Jugador3,3"></textarea>
   
   <br>
@@ -24,9 +66,13 @@
 
   <button onclick="exportarExcel()">Descargar Excel</button>
 
+  <div class="resultados" id="tablaResultados"></div>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script>
     let equiposGlobal = [];
+    let jugadoresGlobal = [];
+    let partidosGlobal = [];
 
     function generarEquipos() {
       let texto = document.getElementById('jugadoresInput').value.trim();
@@ -41,13 +87,11 @@
       for (let linea of lineas) {
         let partes = linea.split(',');
         if (partes.length !== 2) continue;
-        jugadores.push({ nombre: partes[0].trim(), tier: parseInt(partes[1].trim()) });
+        jugadores.push({ nombre: partes[0].trim(), tier: parseInt(partes[1].trim()), puntos: 0 });
       }
 
-      // Mezclar
       jugadores = jugadores.sort(() => Math.random() - 0.5);
 
-      // Separar por tier
       let tier1 = jugadores.filter(j => j.tier === 1);
       let tier2 = jugadores.filter(j => j.tier === 2);
       let tier3 = jugadores.filter(j => j.tier === 3);
@@ -61,9 +105,12 @@
       }
 
       sobrantes = [...tier1, ...tier2, ...tier3];
-      equiposGlobal = equipos; // Guardar para exportar
+      equiposGlobal = equipos;
+      jugadoresGlobal = jugadores;
+      partidosGlobal = [];
 
       mostrarResultados(equipos, sobrantes);
+      actualizarTablaResultados();
     }
 
     function mostrarResultados(equipos, sobrantes) {
@@ -71,13 +118,20 @@
       div.innerHTML = "<h2>Equipos Formados:</h2>";
 
       equipos.forEach((equipo, idx) => {
-        div.innerHTML += `<strong>Equipo ${idx + 1}:</strong> ${equipo.map(j => j.nombre + " (T" + j.tier + ")").join(", ")}<br>`;
+        div.innerHTML += `<div class="equipo"><strong>Equipo ${idx + 1}:</strong><br>${equipo.map(j => j.nombre + " (T" + j.tier + ")").join(", ")}</div>`;
       });
 
       div.innerHTML += "<h2>Partidos:</h2>";
+
       for (let i = 0; i < equipos.length; i += 2) {
         if (i + 1 < equipos.length) {
-          div.innerHTML += `Partido ${i/2 + 1}: Equipo ${i+1} vs Equipo ${i+2}<br>`;
+          let partidoId = partidosGlobal.length;
+          partidosGlobal.push({ equipoA: i, equipoB: i+1, ganador: null });
+          div.innerHTML += `<div class="partido" id="partido${partidoId}">
+            <div onclick="seleccionarGanador(${partidoId}, 'A')"><strong>Equipo ${i+1}</strong></div>
+            VS
+            <div onclick="seleccionarGanador(${partidoId}, 'B')"><strong>Equipo ${i+2}</strong></div>
+          </div>`;
         }
       }
 
@@ -85,6 +139,43 @@
         div.innerHTML += "<h2>Jugadores sobrantes:</h2>";
         div.innerHTML += sobrantes.map(j => j.nombre + " (T" + j.tier + ")").join(", ") + "<br>";
       }
+    }
+
+    function seleccionarGanador(partidoId, equipoGanador) {
+      let partido = partidosGlobal[partidoId];
+      if (partido.ganador !== null) {
+        alert("Ya seleccionaste un ganador para este partido.");
+        return;
+      }
+      partido.ganador = equipoGanador;
+
+      let equipoA = equiposGlobal[partido.equipoA];
+      let equipoB = equiposGlobal[partido.equipoB];
+
+      if (equipoGanador === 'A') {
+        equipoA.forEach(j => j.puntos += 2);
+        equipoB.forEach(j => j.puntos -= 1);
+      } else {
+        equipoB.forEach(j => j.puntos += 2);
+        equipoA.forEach(j => j.puntos -= 1);
+      }
+
+      document.getElementById(`partido${partidoId}`).style.backgroundColor = "#d0ffd0";
+
+      actualizarTablaResultados();
+    }
+
+    function actualizarTablaResultados() {
+      let div = document.getElementById('tablaResultados');
+      div.innerHTML = "<h2>Tabla de Resultados:</h2>";
+
+      let tabla = `<table><tr><th>Nombre</th><th>Tier</th><th>Puntos</th></tr>`;
+      jugadoresGlobal.forEach(j => {
+        tabla += `<tr><td>${j.nombre}</td><td>${j.tier}</td><td>${j.puntos}</td></tr>`;
+      });
+      tabla += `</table>`;
+
+      div.innerHTML += tabla;
     }
 
     function exportarExcel() {
@@ -99,14 +190,14 @@
       equiposGlobal.forEach((equipo, idx) => {
         data.push([`Equipo ${idx + 1}`]);
         equipo.forEach(jugador => {
-          data.push([jugador.nombre, `Tier ${jugador.tier}`]);
+          data.push([jugador.nombre, `Tier ${jugador.tier}`, `Puntos ${jugador.puntos}`]);
         });
         data.push([]);
       });
 
       let ws = XLSX.utils.aoa_to_sheet(data);
-      XLSX.utils.book_append_sheet(wb, ws, "Equipos");
-      XLSX.writeFile(wb, "equipos_partidos.xlsx");
+      XLSX.utils.book_append_sheet(wb, ws, "Equipos y Resultados");
+      XLSX.writeFile(wb, "equipos_resultados.xlsx");
     }
   </script>
 
