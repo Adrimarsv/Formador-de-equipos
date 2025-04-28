@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Formador de Equipos</title>
+  <title>Generador de Equipos y Resultados</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -16,7 +16,7 @@
       height: 150px;
     }
     button {
-      margin: 5px;
+      margin-top: 10px;
       padding: 10px 20px;
       cursor: pointer;
     }
@@ -50,12 +50,6 @@
       padding: 8px;
       text-align: center;
     }
-    .ganador {
-      background-color: #d0ffd0;
-    }
-    .perdedor {
-      background-color: #ffd0d0;
-    }
   </style>
 </head>
 <body>
@@ -63,29 +57,23 @@
   <h1>Generador de Equipos y Partidos</h1>
 
   <p>Ingresa la lista de jugadores (Nombre, Rol, Tier):</p>
-  <textarea id="jugadoresInput" placeholder="Ejemplo:&#10;Juan,Hardcarry,1&#10;Pedro,Off,2&#10;Luis,Medio,1&#10;Carlos,Support,2&#10;Miguel,Support,3"></textarea>
-
-  <div>
-    <button onclick="generarEquipos()">Generar Equipos</button>
-    <button onclick="ordenarTabla('puntos')">Ordenar por Puntos</button>
-    <button onclick="ordenarTabla('tier')">Ordenar por Tier</button>
-    <button onclick="limpiarTabla()">Limpiar Tabla</button>
-    <button onclick="descargarTabla()">Descargar Tabla</button>
-  </div>
+  <textarea id="jugadoresInput" placeholder="Ejemplo:&#10;Juan,Hardcarry,1&#10;Pedro,Off,2&#10;Carlos,Support,3"></textarea>
+  
+  <br>
+  <button onclick="generarEquipos()">Generar Equipos</button>
+  <button onclick="limpiarResultados()">Limpiar Resultados</button>
 
   <div class="resultados" id="resultados"></div>
 
   <div class="resultados" id="tablaResultados"></div>
+  <div class="resultados" id="tablaNoAsignados"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script>
     let equiposGlobal = [];
-    let jugadoresGlobal = JSON.parse(localStorage.getItem('jugadores')) || [];
+    let jugadoresGlobal = [];
     let partidosGlobal = [];
-
-    function guardarLocal() {
-      localStorage.setItem('jugadores', JSON.stringify(jugadoresGlobal));
-    }
+    let jugadoresNoAsignados = [];
 
     function generarEquipos() {
       let texto = document.getElementById('jugadoresInput').value.trim();
@@ -95,70 +83,63 @@
       }
 
       let lineas = texto.split('\n');
-      let nuevosJugadores = [];
+      let jugadores = [];
 
       for (let linea of lineas) {
         let partes = linea.split(',');
         if (partes.length !== 3) continue;
-        let nombre = partes[0].trim();
-        let rol = partes[1].trim();
-        let tier = parseInt(partes[2].trim());
-        let existente = jugadoresGlobal.find(j => j.nombre === nombre);
-        if (existente) {
-          nuevosJugadores.push({...existente, rol, tier});
-        } else {
-          nuevosJugadores.push({ nombre, rol, tier, puntos: 0 });
-        }
+        jugadores.push({ nombre: partes[0].trim(), rol: partes[1].trim(), tier: parseInt(partes[2].trim()), puntos: 0 });
       }
 
-      jugadoresGlobal = nuevosJugadores;
-      guardarLocal();
+      jugadores = jugadores.sort(() => Math.random() - 0.5);
 
-      jugadoresGlobal = jugadoresGlobal.sort(() => Math.random() - 0.5);
+      let hardcarry = jugadores.filter(j => j.rol === "Hardcarry");
+      let medio = jugadores.filter(j => j.rol === "Medio");
+      let off = jugadores.filter(j => j.rol === "Off");
+      let support = jugadores.filter(j => j.rol === "Support");
 
-      let roles = {
-        "Hardcarry": jugadoresGlobal.filter(j => j.rol === "Hardcarry"),
-        "Off": jugadoresGlobal.filter(j => j.rol === "Off"),
-        "Medio": jugadoresGlobal.filter(j => j.rol === "Medio"),
-        "Support": jugadoresGlobal.filter(j => j.rol === "Support")
-      };
+      let equipos = [];
+      let sobrantes = [];
 
-      equiposGlobal = [];
-      partidosGlobal = [];
-
-      while (roles["Hardcarry"].length >= 1 && roles["Off"].length >= 1 && roles["Medio"].length >= 1 && roles["Support"].length >= 2) {
+      while (hardcarry.length >= 1 && medio.length >= 1 && off.length >= 1 && support.length >= 2) {
         let equipo = [
-          roles["Hardcarry"].pop(),
-          roles["Off"].pop(),
-          roles["Medio"].pop(),
-          roles["Support"].pop(),
-          roles["Support"].pop()
+          hardcarry.pop(), 
+          medio.pop(), 
+          off.pop(), 
+          support.pop(), 
+          support.pop()
         ];
-        equiposGlobal.push(equipo);
+        equipos.push(equipo);
       }
 
-      mostrarResultados();
+      sobrantes = [...hardcarry, ...medio, ...off, ...support];
+      equiposGlobal = equipos;
+      jugadoresGlobal = jugadores;
+      jugadoresNoAsignados = sobrantes;
+
+      mostrarResultados(equipos, sobrantes);
       actualizarTablaResultados();
+      mostrarNoAsignados(sobrantes);
     }
 
-    function mostrarResultados() {
+    function mostrarResultados(equipos, sobrantes) {
       let div = document.getElementById('resultados');
       div.innerHTML = "<h2>Equipos Formados:</h2>";
 
-      equiposGlobal.forEach((equipo, idx) => {
-        div.innerHTML += `<div class="equipo"><strong>Equipo ${idx + 1}:</strong><br>${equipo.map(j => j.nombre + " (" + j.rol + ", T" + j.tier + ")").join("<br>")}</div>`;
+      equipos.forEach((equipo, idx) => {
+        div.innerHTML += `<div class="equipo"><strong>Equipo ${idx + 1}:</strong><br>${equipo.map(j => j.nombre + " (" + j.rol + ", T" + j.tier + ")").join(", ")}</div>`;
       });
 
       div.innerHTML += "<h2>Partidos:</h2>";
 
-      for (let i = 0; i < equiposGlobal.length; i += 2) {
-        if (i + 1 < equiposGlobal.length) {
+      for (let i = 0; i < equipos.length; i += 2) {
+        if (i + 1 < equipos.length) {
           let partidoId = partidosGlobal.length;
-          partidosGlobal.push({ equipoA: i, equipoB: i+1, ganador: null });
+          partidosGlobal.push({ equipoA: i, equipoB: i + 1, ganador: null });
           div.innerHTML += `<div class="partido" id="partido${partidoId}">
-            <strong>Equipo ${i+1}</strong> vs <strong>Equipo ${i+2}</strong><br>
-            <button onclick="seleccionarGanador(${partidoId}, 'A')">Ganó Equipo ${i+1}</button>
-            <button onclick="seleccionarGanador(${partidoId}, 'B')">Ganó Equipo ${i+2}</button>
+            <div onclick="seleccionarGanador(${partidoId}, 'A')"><strong>Equipo ${i + 1}</strong></div>
+            VS
+            <div onclick="seleccionarGanador(${partidoId}, 'B')"><strong>Equipo ${i + 2}</strong></div>
           </div>`;
         }
       }
@@ -183,58 +164,47 @@
         equipoA.forEach(j => j.puntos -= 1);
       }
 
-      document.getElementById(`partido${partidoId}`).classList.add("ganador");
-
+      document.getElementById(`partido${partidoId}`).style.backgroundColor = "#d0ffd0";
       actualizarTablaResultados();
-      guardarLocal();
     }
 
     function actualizarTablaResultados() {
       let div = document.getElementById('tablaResultados');
       div.innerHTML = "<h2>Tabla de Resultados:</h2>";
 
-      let tabla = `<table><thead><tr><th>Nombre</th><th>Rol</th><th>Tier</th><th>Puntos</th></tr></thead><tbody>`;
+      let tabla = `<table><tr><th>Nombre</th><th>Rol</th><th>Tier</th><th>Puntos</th></tr>`;
       jugadoresGlobal.forEach(j => {
         tabla += `<tr><td>${j.nombre}</td><td>${j.rol}</td><td>${j.tier}</td><td>${j.puntos}</td></tr>`;
       });
-      tabla += `</tbody></table>`;
+      tabla += `</table>`;
 
       div.innerHTML += tabla;
     }
 
-    function ordenarTabla(criterio) {
-      if (criterio === "puntos") {
-        jugadoresGlobal.sort((a, b) => b.puntos - a.puntos);
-      } else if (criterio === "tier") {
-        jugadoresGlobal.sort((a, b) => a.tier - b.tier);
-      }
-      actualizarTablaResultados();
-    }
+    function mostrarNoAsignados(sobrantes) {
+      let div = document.getElementById('tablaNoAsignados');
+      div.innerHTML = "<h2>Jugadores No Asignados:</h2>";
 
-    function limpiarTabla() {
-      if (confirm("¿Seguro que quieres limpiar todos los datos?")) {
-        jugadoresGlobal = [];
-        equiposGlobal = [];
-        partidosGlobal = [];
-        guardarLocal();
-        actualizarTablaResultados();
-        document.getElementById('resultados').innerHTML = "";
+      if (sobrantes.length === 0) {
+        div.innerHTML += "No hay jugadores sobrantes.";
+        return;
       }
-    }
 
-    function descargarTabla() {
-      let wb = XLSX.utils.book_new();
-      let data = [["Nombre", "Rol", "Tier", "Puntos"]];
-      jugadoresGlobal.forEach(j => {
-        data.push([j.nombre, j.rol, j.tier, j.puntos]);
+      let tabla = `<table><tr><th>Nombre</th><th>Rol</th><th>Tier</th></tr>`;
+      sobrantes.forEach(j => {
+        tabla += `<tr><td>${j.nombre}</td><td>${j.rol}</td><td>${j.tier}</td></tr>`;
       });
+      tabla += `</table>`;
 
-      let ws = XLSX.utils.aoa_to_sheet(data);
-      XLSX.utils.book_append_sheet(wb, ws, "Resultados");
-      XLSX.writeFile(wb, "tabla_resultados.xlsx");
+      div.innerHTML += tabla;
     }
 
-    actualizarTablaResultados();
+    function limpiarResultados() {
+      document.getElementById('jugadoresInput').value = "";
+      document.getElementById('resultados').innerHTML = "";
+      document.getElementById('tablaResultados').innerHTML = "";
+      document.getElementById('tablaNoAsignados').innerHTML = "";
+    }
   </script>
 
 </body>
