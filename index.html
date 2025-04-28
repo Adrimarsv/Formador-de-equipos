@@ -54,7 +54,7 @@
 </head>
 <body>
 
-  <h1>Generador de Equipos y Partidos</h1>
+  <h1>Generador de Equipos y Resultados</h1>
 
   <p>Ingresa la lista de jugadores (Nombre, Rol, Tier):</p>
   <textarea id="jugadoresInput" placeholder="Ejemplo:&#10;Juan,Hardcarry,1&#10;Pedro,Off,2&#10;Carlos,Support,3"></textarea>
@@ -62,9 +62,11 @@
   <br>
   <button onclick="generarEquipos()">Generar Equipos</button>
   <button onclick="limpiarResultados()">Limpiar Resultados</button>
+  <button onclick="ordenarTabla('puntos')">Ordenar por Puntos</button>
+  <button onclick="ordenarTabla('tier')">Ordenar por Tier</button>
+  <button onclick="descargarTabla()">Descargar Tabla</button>
 
   <div class="resultados" id="resultados"></div>
-
   <div class="resultados" id="tablaResultados"></div>
   <div class="resultados" id="tablaNoAsignados"></div>
 
@@ -75,6 +77,28 @@
     let partidosGlobal = [];
     let jugadoresNoAsignados = [];
 
+    // Cargar los resultados anteriores si existen
+    window.onload = function() {
+      if (localStorage.getItem('jugadores')) {
+        jugadoresGlobal = JSON.parse(localStorage.getItem('jugadores'));
+        equiposGlobal = JSON.parse(localStorage.getItem('equipos'));
+        jugadoresNoAsignados = JSON.parse(localStorage.getItem('jugadoresNoAsignados'));
+        partidosGlobal = JSON.parse(localStorage.getItem('partidos'));
+        mostrarResultados(equiposGlobal, jugadoresNoAsignados);
+        actualizarTablaResultados();
+        mostrarNoAsignados(jugadoresNoAsignados);
+      }
+    };
+
+    // Guardar los resultados en localStorage
+    function guardarResultados() {
+      localStorage.setItem('jugadores', JSON.stringify(jugadoresGlobal));
+      localStorage.setItem('equipos', JSON.stringify(equiposGlobal));
+      localStorage.setItem('jugadoresNoAsignados', JSON.stringify(jugadoresNoAsignados));
+      localStorage.setItem('partidos', JSON.stringify(partidosGlobal));
+    }
+
+    // Generar equipos
     function generarEquipos() {
       let texto = document.getElementById('jugadoresInput').value.trim();
       if (!texto) {
@@ -120,8 +144,11 @@
       mostrarResultados(equipos, sobrantes);
       actualizarTablaResultados();
       mostrarNoAsignados(sobrantes);
+
+      guardarResultados();
     }
 
+    // Mostrar equipos formados
     function mostrarResultados(equipos, sobrantes) {
       let div = document.getElementById('resultados');
       div.innerHTML = "<h2>Equipos Formados:</h2>";
@@ -145,6 +172,7 @@
       }
     }
 
+    // Seleccionar ganador y actualizar puntos
     function seleccionarGanador(partidoId, equipoGanador) {
       let partido = partidosGlobal[partidoId];
       if (partido.ganador !== null) {
@@ -166,8 +194,10 @@
 
       document.getElementById(`partido${partidoId}`).style.backgroundColor = "#d0ffd0";
       actualizarTablaResultados();
+      guardarResultados();
     }
 
+    // Actualizar tabla de resultados
     function actualizarTablaResultados() {
       let div = document.getElementById('tablaResultados');
       div.innerHTML = "<h2>Tabla de Resultados:</h2>";
@@ -181,6 +211,7 @@
       div.innerHTML += tabla;
     }
 
+    // Mostrar jugadores no asignados
     function mostrarNoAsignados(sobrantes) {
       let div = document.getElementById('tablaNoAsignados');
       div.innerHTML = "<h2>Jugadores No Asignados:</h2>";
@@ -199,11 +230,37 @@
       div.innerHTML += tabla;
     }
 
+    // Ordenar la tabla
+    function ordenarTabla(criterio) {
+      if (criterio === 'puntos') {
+        jugadoresGlobal.sort((a, b) => b.puntos - a.puntos);
+      } else if (criterio === 'tier') {
+        jugadoresGlobal.sort((a, b) => a.tier - b.tier);
+      }
+      actualizarTablaResultados();
+    }
+
+    // Descargar la tabla en formato Excel
+    function descargarTabla() {
+      let wb = XLSX.utils.book_new();
+      let data = [];
+
+      jugadoresGlobal.forEach(jugador => {
+        data.push([jugador.nombre, jugador.rol, `Tier ${jugador.tier}`, `Puntos ${jugador.puntos}`]);
+      });
+
+      let ws = XLSX.utils.aoa_to_sheet(data);
+      XLSX.utils.book_append_sheet(wb, ws, "Equipos y Resultados");
+      XLSX.writeFile(wb, "equipos_resultados.xlsx");
+    }
+
+    // Limpiar resultados
     function limpiarResultados() {
       document.getElementById('jugadoresInput').value = "";
       document.getElementById('resultados').innerHTML = "";
       document.getElementById('tablaResultados').innerHTML = "";
       document.getElementById('tablaNoAsignados').innerHTML = "";
+      localStorage.clear();
     }
   </script>
 
