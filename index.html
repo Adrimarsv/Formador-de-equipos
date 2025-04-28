@@ -62,9 +62,11 @@
   <br>
   <button onclick="generarEquipos()">Generar Equipos</button>
   <button onclick="ordenarPorPuntos()">Ordenar por Puntos</button>
-  <button onclick="exportarExcel()">Descargar Excel Equipos</button>
-  <button onclick="descargarTabla()">Descargar Tabla de Jugadores</button>
+  <button onclick="ordenarPorTier()">Ordenar por Tier</button>
   <button onclick="limpiarTabla()">Limpiar Tabla</button>
+  <button onclick="descargarTabla()">Descargar Tabla (Excel)</button>
+  <br><br>
+  <input type="file" id="fileInput" onchange="cargarTablaDesdeExcel()" />
 
   <div class="resultados" id="resultados"></div>
 
@@ -73,19 +75,11 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script>
     let equiposGlobal = [];
-    let jugadoresGlobal = [];
+    let jugadoresGlobal = JSON.parse(localStorage.getItem('jugadores')) || [];
     let partidosGlobal = [];
 
-    window.onload = function() {
-      let jugadoresGuardados = localStorage.getItem('jugadoresGlobal');
-      if (jugadoresGuardados) {
-        jugadoresGlobal = JSON.parse(jugadoresGuardados);
-        actualizarTablaResultados();
-      }
-    };
-
-    function guardarJugadoresEnLocalStorage() {
-      localStorage.setItem('jugadoresGlobal', JSON.stringify(jugadoresGlobal));
+    function guardarEnLocalStorage() {
+      localStorage.setItem('jugadores', JSON.stringify(jugadoresGlobal));
     }
 
     function generarEquipos() {
@@ -96,41 +90,37 @@
       }
 
       let lineas = texto.split('\n');
-      let nuevosJugadores = [];
-
       for (let linea of lineas) {
         let partes = linea.split(',');
         if (partes.length !== 2) continue;
-        nuevosJugadores.push({ nombre: partes[0].trim(), tier: parseInt(partes[1].trim()), puntos: 0 });
-      }
-
-      for (let nuevo of nuevosJugadores) {
-        let existente = jugadoresGlobal.find(j => j.nombre === nuevo.nombre);
-        if (!existente) {
-          jugadoresGlobal.push(nuevo);
+        let nombre = partes[0].trim();
+        let tier = parseInt(partes[1].trim());
+        if (!jugadoresGlobal.find(j => j.nombre === nombre)) {
+          jugadoresGlobal.push({ nombre, tier, puntos: 0 });
         }
       }
 
+      guardarEnLocalStorage();
       jugadoresGlobal = jugadoresGlobal.sort(() => Math.random() - 0.5);
 
       let tier1 = jugadoresGlobal.filter(j => j.tier === 1);
       let tier2 = jugadoresGlobal.filter(j => j.tier === 2);
       let tier3 = jugadoresGlobal.filter(j => j.tier === 3);
 
-      equiposGlobal = [];
-      partidosGlobal = [];
+      let equipos = [];
       let sobrantes = [];
 
       while (tier1.length >= 1 && tier2.length >= 2 && tier3.length >= 2) {
         let equipo = [tier1.pop(), tier2.pop(), tier2.pop(), tier3.pop(), tier3.pop()];
-        equiposGlobal.push(equipo);
+        equipos.push(equipo);
       }
 
       sobrantes = [...tier1, ...tier2, ...tier3];
+      equiposGlobal = equipos;
+      partidosGlobal = [];
 
-      mostrarResultados(equiposGlobal, sobrantes);
+      mostrarResultados(equipos, sobrantes);
       actualizarTablaResultados();
-      guardarJugadoresEnLocalStorage();
     }
 
     function mostrarResultados(equipos, sobrantes) {
@@ -180,10 +170,9 @@
         equipoA.forEach(j => j.puntos -= 1);
       }
 
+      guardarEnLocalStorage();
       document.getElementById(`partido${partidoId}`).style.backgroundColor = "#d0ffd0";
-
       actualizarTablaResultados();
-      guardarJugadoresEnLocalStorage();
     }
 
     function actualizarTablaResultados() {
@@ -199,64 +188,75 @@
       div.innerHTML += tabla;
     }
 
-    function exportarExcel() {
-      if (equiposGlobal.length === 0) {
-        alert("Primero genera equipos.");
-        return;
-      }
-
-      let wb = XLSX.utils.book_new();
-      let data = [];
-
-      equiposGlobal.forEach((equipo, idx) => {
-        data.push([`Equipo ${idx + 1}`]);
-        equipo.forEach(jugador => {
-          data.push([jugador.nombre, `Tier ${jugador.tier}`, `Puntos ${jugador.puntos}`]);
-        });
-        data.push([]);
-      });
-
-      let ws = XLSX.utils.aoa_to_sheet(data);
-      XLSX.utils.book_append_sheet(wb, ws, "Equipos y Resultados");
-      XLSX.writeFile(wb, "equipos_resultados.xlsx");
-    }
-
-    function descargarTabla() {
-      if (jugadoresGlobal.length === 0) {
-        alert("No hay jugadores para exportar.");
-        return;
-      }
-
-      let wb = XLSX.utils.book_new();
-      let data = [["Nombre", "Tier", "Puntos"]];
-
-      jugadoresGlobal.forEach(jugador => {
-        data.push([jugador.nombre, jugador.tier, jugador.puntos]);
-      });
-
-      let ws = XLSX.utils.aoa_to_sheet(data);
-      XLSX.utils.book_append_sheet(wb, ws, "Jugadores");
-      XLSX.writeFile(wb, "jugadores_puntos.xlsx");
-    }
-
-    function limpiarTabla() {
-      if (confirm("¿Seguro que quieres borrar todo? Esta acción no se puede deshacer.")) {
-        jugadoresGlobal = [];
-        equiposGlobal = [];
-        partidosGlobal = [];
-        localStorage.clear();
-        document.getElementById('jugadoresInput').value = "";
-        document.getElementById('resultados').innerHTML = "";
-        document.getElementById('tablaResultados').innerHTML = "";
-        alert("Tabla limpiada correctamente.");
-      }
-    }
-
     function ordenarPorPuntos() {
       jugadoresGlobal.sort((a, b) => b.puntos - a.puntos);
       actualizarTablaResultados();
     }
 
+    function ordenarPorTier() {
+      jugadoresGlobal.sort((a, b) => a.tier - b.tier);
+      actualizarTablaResultados();
+    }
+
+    function limpiarTabla() {
+      if (confirm("¿Estás seguro de limpiar toda la tabla?")) {
+        jugadoresGlobal = [];
+        localStorage.removeItem('jugadores');
+        actualizarTablaResultados();
+      }
+    }
+
+    function descargarTabla() {
+      if (jugadoresGlobal.length === 0) {
+        alert("No hay datos para descargar.");
+        return;
+      }
+      let wb = XLSX.utils.book_new();
+      let data = [["Nombre", "Tier", "Puntos"]];
+      jugadoresGlobal.forEach(j => {
+        data.push([j.nombre, j.tier, j.puntos]);
+      });
+      let ws = XLSX.utils.aoa_to_sheet(data);
+      XLSX.utils.book_append_sheet(wb, ws, "Tabla");
+      XLSX.writeFile(wb, "tabla_jugadores.xlsx");
+    }
+
+    function cargarTablaDesdeExcel() {
+      const file = document.getElementById('fileInput').files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+        json.shift(); // eliminar encabezado
+        json.forEach(row => {
+          if (row.length >= 3) {
+            const nombre = row[0];
+            const tier = parseInt(row[1]);
+            const puntos = parseInt(row[2]);
+
+            const jugadorExistente = jugadoresGlobal.find(j => j.nombre === nombre);
+            if (jugadorExistente) {
+              jugadorExistente.tier = tier;
+              jugadorExistente.puntos = puntos;
+            } else {
+              jugadoresGlobal.push({ nombre, tier, puntos });
+            }
+          }
+        });
+
+        guardarEnLocalStorage();
+        actualizarTablaResultados();
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // Cargar al iniciar
+    actualizarTablaResultados();
   </script>
 
 </body>
