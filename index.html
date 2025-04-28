@@ -66,6 +66,8 @@
 
   <button onclick="exportarExcel()">Descargar Excel</button>
 
+  <input type="file" id="fileInput" onchange="cargarArchivoExcel()" />
+  
   <div class="resultados" id="tablaResultados"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -169,6 +171,11 @@
       let div = document.getElementById('tablaResultados');
       div.innerHTML = "<h2>Tabla de Resultados:</h2>";
 
+      div.innerHTML += `
+        <button onclick="ordenarPorNombre()">Ordenar por Nombre</button>
+        <button onclick="ordenarPorPuntos()">Ordenar por Puntos</button>
+      `;
+
       let tabla = `<table><tr><th>Nombre</th><th>Tier</th><th>Puntos</th></tr>`;
       jugadoresGlobal.forEach(j => {
         tabla += `<tr><td>${j.nombre}</td><td>${j.tier}</td><td>${j.puntos}</td></tr>`;
@@ -176,6 +183,16 @@
       tabla += `</table>`;
 
       div.innerHTML += tabla;
+    }
+
+    function ordenarPorNombre() {
+      jugadoresGlobal.sort((a, b) => a.nombre.localeCompare(b.nombre));
+      actualizarTablaResultados();
+    }
+
+    function ordenarPorPuntos() {
+      jugadoresGlobal.sort((a, b) => b.puntos - a.puntos);
+      actualizarTablaResultados();
     }
 
     function exportarExcel() {
@@ -198,6 +215,40 @@
       let ws = XLSX.utils.aoa_to_sheet(data);
       XLSX.utils.book_append_sheet(wb, ws, "Equipos y Resultados");
       XLSX.writeFile(wb, "equipos_resultados.xlsx");
+    }
+
+    function cargarArchivoExcel() {
+      let input = document.getElementById('fileInput');
+      let archivo = input.files[0];
+      
+      if (!archivo) {
+        alert("Por favor, selecciona un archivo Excel.");
+        return;
+      }
+
+      let reader = new FileReader();
+      reader.onload = function(event) {
+        let data = event.target.result;
+        let wb = XLSX.read(data, { type: 'binary' });
+
+        // Obtener la primera hoja del archivo Excel
+        let ws = wb.Sheets[wb.SheetNames[0]];
+        
+        // Convertir la hoja a un formato JSON
+        let jugadoresDelArchivo = XLSX.utils.sheet_to_json(ws);
+        
+        // Actualizar jugadoresGlobal con los puntos del archivo cargado
+        jugadoresDelArchivo.forEach(jugador => {
+          let jugadorExistente = jugadoresGlobal.find(j => j.nombre === jugador.Nombre);
+          if (jugadorExistente) {
+            jugadorExistente.puntos += jugador.Puntos;
+          }
+        });
+
+        actualizarTablaResultados();
+      };
+
+      reader.readAsBinaryString(archivo);
     }
   </script>
 
